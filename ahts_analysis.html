@@ -155,8 +155,9 @@ function median(arr) {
 
 function loadAll() {
     return shipNames.map(name => {
-        const d = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', dr:'-', eta:'-', nav:'-', dest:'-', ts:null, history:[] };
+        const d = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', dr:'-', eta:'-', nav:'-', dest:'-', ts:null, history:[], updateCount:0 };
         if (!Array.isArray(d.history)) d.history = [];
+        if (typeof d.updateCount !== 'number') d.updateCount = 0;
         return { name, ...d };
     });
 }
@@ -181,19 +182,21 @@ function allSegments(ships) {
 
 // ── Fleet stats ──────────────────────────────────────────────────────────────
 function drawStats(ships) {
-    let working=0, transit=0, idle=0, totalHistory=0;
+    let working=0, transit=0, idle=0, totalHistory=0, totalUpdates=0;
     ships.forEach(s => {
         const st = classify(s.nav);
         if (st.cls==='working') working++;
         else if (st.cls==='transit') transit++;
         else idle++;
         totalHistory += s.history.length;
+        totalUpdates += s.updateCount || 0;
     });
     document.getElementById('statGrid').innerHTML = `
         <div class="stat-card"><div class="stat-val" style="color:#10b981">${working}</div><div class="stat-lbl">På jobb nå</div></div>
         <div class="stat-card"><div class="stat-val" style="color:#38bdf8">${transit}</div><div class="stat-lbl">Underveis nå</div></div>
         <div class="stat-card"><div class="stat-val" style="color:#64748b">${idle}</div><div class="stat-lbl">Venter nå</div></div>
         <div class="stat-card"><div class="stat-val">${totalHistory}</div><div class="stat-lbl">Loggede statusendringer</div></div>
+        <div class="stat-card"><div class="stat-val">${totalUpdates}</div><div class="stat-lbl">Oppdateringer totalt</div></div>
     `;
 }
 
@@ -350,13 +353,14 @@ window.drawShipHistory = function() {
     const name = document.getElementById('shipSelect').value;
     const ship = loadAll().find(s => s.name === name);
     const segs = [...shipSegments(ship)].reverse();
+    const updateNote = `<p class="section-note" style="margin-top:0">🔄 ${ship.updateCount || 0} oppdateringer totalt for dette skipet</p>`;
 
     const el = document.getElementById('shipHistContent');
     if (segs.length === 0) {
-        el.innerHTML = '<p class="no-data">Ingen historikk registrert ennå.</p>';
+        el.innerHTML = updateNote + '<p class="no-data">Ingen historikk registrert ennå.</p>';
         return;
     }
-    el.innerHTML = `<table>
+    el.innerHTML = updateNote + `<table>
         <thead><tr>
             <th>Fra</th><th>Til</th><th>Rute</th><th>Status</th><th>Varighet</th>
         </tr></thead>

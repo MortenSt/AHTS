@@ -154,6 +154,7 @@
                             <span class="history-count">📋 ${histLen} loggede bevegelser</span>
                             <span class="owner-tag">Eier: ${ship.owner}</span>
                         </div>
+                        <span class="history-count">🔄 ${data.updateCount || 0} oppdateringer totalt</span>
                         <textarea id="x-${ship.name}" class="notes-area" placeholder="Notater...">${data.x || ''}</textarea>
                         <textarea id="mt-${ship.name}" class="input-area" placeholder="Lim inn rådata fra MarineTraffic..."></textarea>
                         <button class="btn btn-save" onclick="save('${ship.name}')">Lagre Status</button>
@@ -175,10 +176,13 @@
                 }
             }
 
-            let current = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', eta:'-', dr:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[] };
+            let current = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', eta:'-', dr:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[], updateCount:0 };
             if (!Array.isArray(current.history)) current.history = [];
+            if (typeof current.updateCount !== 'number') current.updateCount = 0;
 
             if (mtText) {
+                current.updateCount = (current.updateCount || 0) + 1;
+
                 const newDep  = parseDep(mtText);
                 const newArr  = parseArr(mtText);
                 const newDr   = parseDr(mtText);
