@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AHTS Intelligence</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: #0f172a; color: #f1f5f9; padding: 20px; max-width: 900px; margin: 0 auto; }
+        .header { border-bottom: 2px solid #334155; padding-bottom: 15px; margin-bottom: 25px; }
+        h1 { color: #38bdf8; margin: 0 0 6px 0; font-size: 1.7rem; }
+        .subtitle { color: #94a3b8; font-size: 0.9em; margin: 0; }
+        .summary-bar { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 15px 20px; margin-bottom: 25px; display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+        .summary-stat { text-align: center; }
+        .summary-stat .val { font-size: 1.8rem; font-weight: bold; }
+        .summary-stat .lbl { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; }
+        .val-working { color: #10b981; }
+        .val-transit { color: #38bdf8; }
+        .val-idle { color: #64748b; }
+        .val-total { color: #38bdf8; }
+        .nav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .nav-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 22px; text-decoration: none; color: inherit; display: block; transition: 0.2s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .nav-card:hover { border-color: #38bdf8; transform: translateY(-2px); }
+        .nav-card .icon { font-size: 1.8rem; margin-bottom: 8px; display: block; }
+        .nav-card h2 { color: #38bdf8; font-size: 1.15rem; margin: 0 0 6px 0; }
+        .nav-card p { color: #94a3b8; font-size: 0.88em; margin: 0; line-height: 1.4; }
+        .empty-note { color: #64748b; font-size: 0.85em; text-align: center; padding: 10px; }
+        footer { color: #64748b; font-size: 0.78em; margin-top: 30px; border-top: 1px solid #334155; padding-top: 15px; line-height: 1.6; }
+        footer a { color: #38bdf8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚓ AHTS Intelligence</h1>
+        <p class="subtitle">Flåteovervåking — AHTS AS, 15 ankerhåndteringsfartøy (RTO-target-kandidat)</p>
+    </div>
+
+    <div id="summary" class="summary-bar"></div>
+
+    <div class="nav-grid">
+        <a href="ahts_tracker.html" class="nav-card">
+            <span class="icon">📡</span>
+            <h2>Tracker</h2>
+            <p>Lim inn MarineTraffic-data per skip, se status, rute og ETA. Lagrer historikk automatisk ved rute- eller statusendring.</p>
+        </a>
+        <a href="ahts_analysis.html" class="nav-card">
+            <span class="icon">📊</span>
+            <h2>Analyser historikk</h2>
+            <p>Pågående jobbvarighet, typisk varighet per status, hyppigste ruter og full historikk per skip.</p>
+        </a>
+    </div>
+
+    <footer>
+        Data hentes manuelt fra MarineTraffic og lagres lokalt i nettleseren (localStorage) — ingenting sendes til en server.
+        Se <a href="https://www.marinetraffic.com/en/ais/home" target="_blank">MarineTraffic</a> for kildedata.
+    </footer>
+
+    <script>
+        // Samme flåteliste som ahts_tracker.html / ahts_analysis.html — kun for oppsummeringstelling her.
+        const shipNames = [
+            "GH Challenger", "GH Columbia", "MH Discovery", "MH Enterprise", "MH Explorer",
+            "MH Freedom", "MH Liberty", "GH Navigator", "GH Pathfinder", "MH Voyager",
+            "MH Atlantis", "Aurora Challenger", "Skandi Peregrino", "Skandi Emerald",
+            "Launcher (Navvik Launcher)"
+        ];
+
+        function getStatus(navStatus) {
+            const s = (navStatus || "").toLowerCase();
+            if (s.includes("restricted manoeuvrability") || s.includes("engaged in anchor handling") || s.includes("not under command"))
+                return "working";
+            if (s.includes("underway"))
+                return "transit";
+            if (s.includes("anchor") || s.includes("moored") || s.includes("stopped") || s)
+                return "idle";
+            return "idle";
+        }
+
+        function drawSummary() {
+            let working = 0, transit = 0, idle = 0, tracked = 0;
+            shipNames.forEach(name => {
+                const raw = localStorage.getItem(name);
+                if (!raw) return;
+                const d = JSON.parse(raw) || {};
+                if (!d.nav) return;
+                tracked++;
+                const st = getStatus(d.nav);
+                if (st === 'working') working++;
+                else if (st === 'transit') transit++;
+                else idle++;
+            });
+
+            if (tracked === 0) {
+                document.getElementById('summary').outerHTML = '<div class="empty-note">Ingen data lagret ennå i denne nettleseren — åpne Tracker og lim inn MarineTraffic-data for å komme i gang.</div>';
+                return;
+            }
+
+            document.getElementById('summary').innerHTML = `
+                <div class="summary-stat"><div class="val val-total">${shipNames.length}</div><div class="lbl">Skip totalt</div></div>
+                <div class="summary-stat"><div class="val val-working">${working}</div><div class="lbl">På jobb</div></div>
+                <div class="summary-stat"><div class="val val-transit">${transit}</div><div class="lbl">Underveis</div></div>
+                <div class="summary-stat"><div class="val val-idle">${idle}</div><div class="lbl">Venter</div></div>
+            `;
+        }
+
+        drawSummary();
+    </script>
+</body>
+</html>
