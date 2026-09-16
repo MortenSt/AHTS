@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AHTS Intelligence v1</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: #0f172a; color: #f1f5f9; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; padding-bottom: 15px; margin-bottom: 25px; flex-wrap: wrap; gap: 12px; }
+        h1 { color: #38bdf8; margin: 0; font-size: 1.5rem; }
+        .btn-group { display: flex; gap: 10px; }
+        .btn { border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-clear { background: #ef4444; color: white; }
+        .btn-report { background: #10b981; color: white; }
+        .btn-analysis { background: #8b5cf6; color: white; }
+        .btn-save { background: #38bdf8; color: #0f172a; width: 100%; margin-top: 15px; padding: 12px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h3 { color: #38bdf8; margin: 0 0 15px 0; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .info-box { background: #0f172a; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #38bdf8; }
+        .info-line { margin-bottom: 8px; font-size: 0.95em; }
+        .label-text { color: #94a3b8; font-size: 0.8em; font-weight: bold; text-transform: uppercase; margin-right: 10px; }
+        .status-tag { font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin-left: 5px; font-weight: bold; }
+        .working { background: #059669; color: white; }
+        .transit { background: #0284c7; color: white; }
+        .idle { background: #475569; color: white; }
+        .updated-text { font-size: 0.75em; color: #38bdf8; margin-top: 10px; display: block; font-weight: 500; }
+        .history-count { font-size: 0.7em; color: #64748b; margin-top: 4px; display: block; }
+        .alert { background: #7f1d1d; color: #fecaca; font-size: 0.75em; padding: 8px; border-radius: 4px; margin-top: 10px; display: block; border-left: 4px solid #ef4444; }
+        .owner-tag { font-size: 0.68em; color: #64748b; margin-top: 4px; display: block; }
+        textarea { width: 100%; background: #334155; color: white; border: 1px solid #475569; border-radius: 6px; padding: 10px; box-sizing: border-box; margin-top: 5px; font-family: inherit; font-size: 0.85em; }
+        .notes-area { height: 60px; }
+        .input-area { height: 65px; font-size: 0.8em; }
+        textarea::placeholder { color: #64748b; font-style: italic; }
+        .mt-link { color: #38bdf8; text-decoration: none; font-size: 0.75em; border: 1px solid #38bdf8; padding: 4px 10px; border-radius: 5px; float: right; }
+        .summary-bar { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 15px 20px; margin-bottom: 25px; display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+        .summary-stat { text-align: center; }
+        .summary-stat .val { font-size: 1.8rem; font-weight: bold; }
+        .summary-stat .lbl { font-size: 0.75em; color: #94a3b8; text-transform: uppercase; }
+        .val-working { color: #10b981; }
+        .val-transit { color: #38bdf8; }
+        .val-idle { color: #64748b; }
+        .val-total { color: #38bdf8; }
+        .print-header { display: none; }
+        @media print {
+            body { background-color: white; color: black; padding: 0; }
+            .btn, .mt-link, textarea, .input-area, .btn-group, .header button, .summary-bar { display: none !important; }
+            .print-header { display: block; text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+            .print-header h1 { color: black; font-size: 1.3rem; margin: 0 0 4px 0; }
+            .print-header .print-ts { font-size: 0.85em; color: #555; }
+            .grid { display: block; }
+            .card { border: none; border-bottom: 1px solid #ccc; margin-bottom: 20px; page-break-inside: avoid; background: white; }
+            h3, .info-box { color: black !important; background: white !important; border: 1px solid #eee; }
+            .status-tag { border: 1px solid black; color: black !important; background: transparent !important; }
+            h1 { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚓ AHTS Intelligence v1</h1>
+        <div class="btn-group">
+            <button class="btn btn-analysis" onclick="window.open('ahts_analysis.html','_blank')">Analyser historikk ↗</button>
+            <button class="btn btn-report" onclick="generateReport()">Generer Rapport (PDF)</button>
+            <button class="btn btn-clear" onclick="clearAll()">Slett data</button>
+        </div>
+    </div>
+
+    <div id="summary" class="summary-bar"></div>
+    <div id="container" class="grid"></div>
+
+    <script>
+        // AHTS AS — 15-skips flåte, RTO-target for 2020 Bulkers. IMO/eier bekreftet 2026-09-16
+        // (se finance/ahts.md). Eierfelt: "AHTS AS" = direkte eid; navngitt SPV = kjent SPV-eier.
+        const shipData = [
+            { name: "GH Challenger",     imo: "9417414", owner: "AHTS AS" },
+            { name: "GH Columbia",       imo: "9417426", owner: "AHTS AS" },
+            { name: "MH Discovery",      imo: "9435088", owner: "AHTS AS" },
+            { name: "MH Enterprise",     imo: "9439905", owner: "AHTS AS" },
+            { name: "MH Explorer",       imo: "9439917", owner: "AHTS AS" },
+            { name: "MH Freedom",        imo: "9439929", owner: "AHTS AS" },
+            { name: "MH Liberty",        imo: "9439931", owner: "AHTS AS" },
+            { name: "GH Navigator",      imo: "9439943", owner: "AHTS AS" },
+            { name: "GH Pathfinder",     imo: "9439955", owner: "AHTS AS" },
+            { name: "MH Voyager",        imo: "9439967", owner: "AHTS AS" },
+            { name: "MH Atlantis",       imo: "9455117", owner: "AHTS AS" },
+            { name: "Aurora Challenger", imo: "9420174", owner: "Anchor Challenger AS" },
+            { name: "Skandi Peregrino",  imo: "9447627", owner: "UMAS 49 AS / Anchor Australia AS (uavklart)" },
+            { name: "Skandi Emerald",    imo: "9447639", owner: "UMAS 42 AS" },
+            { name: "Launcher (Navvik Launcher)", imo: "9425746", owner: "Anchor Launcher AS" }
+        ];
+
+        const MAX_HISTORY = 100;
+
+        function getStatus(navStatus) {
+            const s = (navStatus || "").toLowerCase();
+            if (s.includes("restricted manoeuvrability") || s.includes("engaged in anchor handling") || s.includes("not under command"))
+                return { label: "PÅ JOBB", cls: "working" };
+            if (s.includes("underway"))
+                return { label: "UNDERVEIS", cls: "transit" };
+            if (s.includes("anchor") || s.includes("moored") || s.includes("stopped") || s)
+                return { label: "VENTER", cls: "idle" };
+            return { label: "UKJENT", cls: "idle" };
+        }
+
+        function getRelativeTimeString(timestamp) {
+            if (!timestamp) return "Aldri";
+            const now = new Date();
+            const diffDays = Math.floor(Math.abs(now - new Date(timestamp)) / 86400000);
+            if (diffDays === 0) return "i dag";
+            if (diffDays === 1) return "1 dag siden";
+            return `${diffDays} dager siden`;
+        }
+
+        function drawSummary() {
+            let working = 0, transit = 0, idle = 0;
+            shipData.forEach(ship => {
+                const d = JSON.parse(localStorage.getItem(ship.name)) || {};
+                const st = getStatus(d.nav || '');
+                if (st.cls === 'working') working++;
+                else if (st.cls === 'transit') transit++;
+                else idle++;
+            });
+            document.getElementById('summary').innerHTML = `
+                <div class="summary-stat"><div class="val val-total">${shipData.length}</div><div class="lbl">Skip totalt</div></div>
+                <div class="summary-stat"><div class="val val-working">${working}</div><div class="lbl">På jobb</div></div>
+                <div class="summary-stat"><div class="val val-transit">${transit}</div><div class="lbl">Underveis</div></div>
+                <div class="summary-stat"><div class="val val-idle">${idle}</div><div class="lbl">Venter</div></div>
+                <div class="summary-stat" style="margin-left:auto;font-size:0.8em;color:#64748b;">
+                    Sist oppdatert: ${new Date().toLocaleString('no-NO',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+                </div>
+            `;
+        }
+
+        function draw() {
+            drawSummary();
+            const container = document.getElementById('container');
+            container.innerHTML = '';
+            shipData.forEach(ship => {
+                const data = JSON.parse(localStorage.getItem(ship.name)) || { dep:'-', arr:'-', eta:'-', dr:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[] };
+                const st = getStatus(data.nav);
+                const histLen = (data.history || []).length;
+                container.innerHTML += `
+                    <div class="card">
+                        <a href="https://www.marinetraffic.com/en/ais/details/ships/imo:${ship.imo}" target="_blank" class="mt-link">MT ↗</a>
+                        <h3>${ship.name}</h3>
+                        <div class="info-box">
+                            <div class="info-line"><span class="label-text">STATUS:</span> <b>${data.nav || '-'}</b> <span class="status-tag ${st.cls}">${st.label}</span></div>
+                            <div class="info-line"><span class="label-text">RUTE:</span> <b>${data.dep} ➔ ${data.arr}</b></div>
+                            <div class="info-line"><span class="label-text">DEST:</span> <b>${data.dest || '-'}</b></div>
+                            <div class="info-line"><span class="label-text">ETA:</span> <b>${data.eta}</b></div>
+                            <div class="info-line"><span class="label-text">DYP:</span> <b>${data.dr} m</b></div>
+                            <span class="updated-text">OPPDATERT: ${getRelativeTimeString(data.ts)} (${data.updated})</span>
+                            <span class="history-count">📋 ${histLen} loggede bevegelser</span>
+                            <span class="owner-tag">Eier: ${ship.owner}</span>
+                        </div>
+                        <textarea id="x-${ship.name}" class="notes-area" placeholder="Notater...">${data.x || ''}</textarea>
+                        <textarea id="mt-${ship.name}" class="input-area" placeholder="Lim inn rådata fra MarineTraffic..."></textarea>
+                        <button class="btn btn-save" onclick="save('${ship.name}')">Lagre Status</button>
+                    </div>
+                `;
+            });
+        }
+
+        window.save = function(name) {
+            const mtText = document.getElementById('mt-' + name).value;
+            const xText  = document.getElementById('x-'  + name).value;
+
+            if (mtText) {
+                const upperText = mtText.toUpperCase();
+                const foundOtherShip = shipData.find(s => s.name !== name && upperText.includes(s.name.toUpperCase()));
+                if (foundOtherShip) {
+                    const ok = confirm(`⚠️ ADVARSEL: Navne-mismatch!\n\nDataene ser ut til å tilhøre "${foundOtherShip.name}".\n\nVil du fortsette likevel?`);
+                    if (!ok) return;
+                }
+            }
+
+            let current = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', eta:'-', dr:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[] };
+            if (!Array.isArray(current.history)) current.history = [];
+
+            if (mtText) {
+                const newDep  = parseDep(mtText);
+                const newArr  = parseArr(mtText);
+                const newDr   = parseDr(mtText);
+                const newEta  = parseEta(mtText);
+                const newNav  = parseNav(mtText);
+                const newDest = parseDest(mtText);
+
+                // Logg gammel posisjon/status dersom rute eller status har endret seg
+                const changed = (newDep && newDep !== current.dep) || (newArr && newArr !== current.arr) || (newNav && newNav !== current.nav);
+                const hasCurrentData = current.dep !== '-' && current.dep;
+                if (changed && hasCurrentData) {
+                    current.history.push({
+                        dep: current.dep, arr: current.arr, dr: current.dr,
+                        eta: current.eta, nav: current.nav, dest: current.dest,
+                        ts: current.ts, updated: current.updated
+                    });
+                    if (current.history.length > MAX_HISTORY) {
+                        current.history = current.history.slice(-MAX_HISTORY);
+                    }
+                }
+
+                if (newDr)   current.dr   = newDr;
+                if (newEta)  current.eta  = newEta;
+                if (newDep)  current.dep  = newDep;
+                if (newArr)  current.arr  = newArr;
+                if (newNav)  current.nav  = newNav;
+                if (newDest) current.dest = newDest;
+            }
+
+            current.x       = xText;
+            current.ts      = Date.now();
+            current.updated = new Date().toLocaleString('no-NO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+            localStorage.setItem(name, JSON.stringify(current));
+            draw();
+        };
+
+        function parseDr(text) {
+            const m = text.match(/Draught[^0-9]*([0-9]+\.?[0-9]*)\s*m/i);
+            return m ? m[1] : null;
+        }
+        function parseEta(text) {
+            const etaM = text.match(/Reported ETA[^0-9]*([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n\r]*)/i);
+            const ataM = text.match(/Actual time of arrival[^0-9]*([0-9]{4}-[0-9]{2}-[0-9]{2}[^\n\r]*)/i);
+            if (ataM) return "✅ Ankommet: " + ataM[1].trim();
+            if (etaM) return etaM[1].trim();
+            return null;
+        }
+        function parseDep(text) {
+            const m = text.split(/Departure from/i);
+            if (m[1]) return m[1].split(/\n/)[0].replace(/at\s*/i,'').trim().split(/[,\n]/)[0].trim();
+            return null;
+        }
+        function parseArr(text) {
+            const m = text.split(/Arrival at/i);
+            if (m[1]) return m[1].split(/\n/)[0].trim().split(/[,\n]/)[0].trim();
+            return null;
+        }
+        function parseNav(text) {
+            const m = text.match(/Navigational status\s*\n+\s*([^\n]+)/i);
+            return m ? m[1].trim() : null;
+        }
+        function parseDest(text) {
+            const m = text.match(/Matched destination\s*\n+\s*([^\n]+)/i);
+            if (m && m[1].trim() !== '-') return m[1].trim();
+            const r = text.match(/Reported destination\s*\n+\s*([^\n]+)/i);
+            return r ? r[1].trim() : null;
+        }
+
+        window.generateReport = function() {
+            const now = new Date();
+            const ts = now.toLocaleString('no-NO', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }).replace(/[.:]/g, '-').replace(', ', '_').replace(' ', '');
+            const originalTitle = document.title;
+            document.title = `AHTS Intelligence - ${ts}`;
+            window.print();
+            document.title = originalTitle;
+        };
+
+        window.clearAll = function() {
+            if (confirm("Slette ALL data inkludert historikk?")) {
+                shipData.forEach(s => localStorage.removeItem(s.name));
+                draw();
+            }
+        };
+
+        draw();
+    </script>
+</body>
+</html>
