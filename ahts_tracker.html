@@ -85,7 +85,7 @@
             { name: "MH Voyager",        imo: "9439967", owner: "AHTS AS" },
             { name: "MH Atlantis",       imo: "9455117", owner: "AHTS AS" },
             { name: "Aurora Challenger", imo: "9420174", owner: "Anchor Challenger AS" },
-            { name: "Skandi Peregrino",  imo: "9447627", owner: "UMAS 49 AS / Anchor Australia AS (uavklart)" },
+            { name: "Skandi Peregrino",  imo: "9447627", owner: "Anchor Australia AS" },
             { name: "Skandi Emerald",    imo: "9447639", owner: "UMAS 42 AS" },
             { name: "Launcher (Navvik Launcher)", imo: "9425746", owner: "Anchor Launcher AS" }
         ];
@@ -137,7 +137,7 @@
             const container = document.getElementById('container');
             container.innerHTML = '';
             shipData.forEach(ship => {
-                const data = JSON.parse(localStorage.getItem(ship.name)) || { dep:'-', arr:'-', eta:'-', dr:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[] };
+                const data = JSON.parse(localStorage.getItem(ship.name)) || { dep:'-', arr:'-', eta:'-', dr:'-', spd:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[] };
                 const st = getStatus(data.nav);
                 const histLen = (data.history || []).length;
                 container.innerHTML += `
@@ -150,6 +150,7 @@
                             <div class="info-line"><span class="label-text">DEST:</span> <b>${data.dest || '-'}</b></div>
                             <div class="info-line"><span class="label-text">ETA:</span> <b>${data.eta}</b></div>
                             <div class="info-line"><span class="label-text">DYP:</span> <b>${data.dr} m</b></div>
+                            <div class="info-line"><span class="label-text">FART:</span> <b>${data.spd || '-'} kn</b></div>
                             <span class="updated-text">OPPDATERT: ${getRelativeTimeString(data.ts)} (${data.updated})</span>
                             <span class="history-count">📋 ${histLen} loggede bevegelser</span>
                             <span class="owner-tag">Eier: ${ship.owner}</span>
@@ -176,7 +177,7 @@
                 }
             }
 
-            let current = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', eta:'-', dr:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[], updateCount:0 };
+            let current = JSON.parse(localStorage.getItem(name)) || { dep:'-', arr:'-', eta:'-', dr:'-', spd:'-', nav:'-', dest:'-', x:'', updated:'-', ts:null, history:[], updateCount:0 };
             if (!Array.isArray(current.history)) current.history = [];
             if (typeof current.updateCount !== 'number') current.updateCount = 0;
 
@@ -186,6 +187,7 @@
                 const newDep  = parseDep(mtText);
                 const newArr  = parseArr(mtText);
                 const newDr   = parseDr(mtText);
+                const newSpd  = parseSpeed(mtText);
                 const newEta  = parseEta(mtText);
                 const newNav  = parseNav(mtText);
                 const newDest = parseDest(mtText);
@@ -195,7 +197,7 @@
                 const hasCurrentData = current.dep !== '-' && current.dep;
                 if (changed && hasCurrentData) {
                     current.history.push({
-                        dep: current.dep, arr: current.arr, dr: current.dr,
+                        dep: current.dep, arr: current.arr, dr: current.dr, spd: current.spd,
                         eta: current.eta, nav: current.nav, dest: current.dest,
                         ts: current.ts, updated: current.updated
                     });
@@ -205,6 +207,7 @@
                 }
 
                 if (newDr)   current.dr   = newDr;
+                if (newSpd)  current.spd  = newSpd;
                 if (newEta)  current.eta  = newEta;
                 if (newDep)  current.dep  = newDep;
                 if (newArr)  current.arr  = newArr;
@@ -222,6 +225,13 @@
 
         function parseDr(text) {
             const m = text.match(/Draught[^0-9]*([0-9]+\.?[0-9]*)\s*m/i);
+            return m ? m[1] : null;
+        }
+        function parseSpeed(text) {
+            // Best-effort: MarineTraffic viser typisk "Speed/Course" etterfulgt av "X.X kn / YYY°".
+            // Uverifisert mot en fersk lim-inn — sjekk at tallet stemmer etter første reelle bruk.
+            const m = text.match(/Speed\s*\/?\s*Course[^\n]*\n+\s*([0-9]+\.?[0-9]*)\s*kn/i)
+                   || text.match(/([0-9]+\.?[0-9]*)\s*kn\b/i);
             return m ? m[1] : null;
         }
         function parseEta(text) {
